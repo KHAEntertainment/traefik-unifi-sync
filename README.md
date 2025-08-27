@@ -101,6 +101,58 @@ secrets:
     file: ./unifi_key.pem
 ```
 
+### Example (Docker Swarm)
+
+For Docker Swarm users, you can deploy the sync container as a stack and
+use Docker secrets for sensitive values such as your SSH private key.  First
+create a secret on your Swarm manager node:
+
+```sh
+docker secret create unifi_ssh_key ./unifi_key.pem
+```
+
+Then deploy a stack using a file like the following.  A copy of this
+configuration is included as `docker-stack.yml` in this repository.  Be sure
+to replace `yourrepo/traefik-unifi-sync:latest` with the image you built and
+pushed to a registry (e.g. ghcr.io/myuser/traefik-unifi-sync:latest).
+
+```yaml
+version: '3.9'
+
+services:
+  traefik-unifi-sync:
+    image: yourrepo/traefik-unifi-sync:latest
+    environment:
+      - TRAEFIK_API_URL=http://traefik:8080/api
+      - UNIFI_SSH_HOST=192.168.1.1
+      - UNIFI_SSH_USER=root
+      - UNIFI_SSH_PRIVATE_KEY=/run/secrets/unifi_ssh_key
+      - SYNC_INTERVAL=3600
+    secrets:
+      - unifi_ssh_key
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+
+secrets:
+  unifi_ssh_key:
+    external: true
+```
+
+Deploy the stack with:
+
+```sh
+docker stack deploy -c docker-stack.yml traefik-unifi-sync
+```
+
+Swarm will mount the `unifi_ssh_key` secret as a file at
+`/run/secrets/unifi_ssh_key` inside the container.  The script reads the
+private key from that path to authenticate to your UniFi device.  For
+additional sensitive values such as Traefik API credentials you can either
+set them as environment variables on the service or modify the script to
+read `_FILE`‑suffixed environment variables pointing to secret files.
+
 ## Caveats
 
 * **UniFi Network Application**:  This script targets UniFi OS gateways.  If
