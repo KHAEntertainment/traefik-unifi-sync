@@ -1,0 +1,37 @@
+version: '3.9'
+
+# Docker Swarm stack file for traefik-unifi-sync.
+#
+# This example shows how to deploy the sync container on a swarm and
+# use Docker secrets for sensitive values.  Before deploying, you
+# should create the `unifi_ssh_key` secret using:
+#
+#   docker secret create unifi_ssh_key ./unifi_key.pem
+#
+# Replace `yourrepo/traefik-unifi-sync:latest` with the actual image
+# you pushed to a registry (e.g. ghcr.io/myuser/traefik-unifi-sync:latest).
+
+services:
+  traefik-unifi-sync:
+    image: yourrepo/traefik-unifi-sync:latest
+    environment:
+      # Traefik API endpoint.  Must be reachable from the swarm network.
+      - TRAEFIK_API_URL=http://traefik:8080/api
+      # Hostname or IP of your UniFi OS device
+      - UNIFI_SSH_HOST=192.168.1.1
+      # SSH username on the UniFi device
+      - UNIFI_SSH_USER=root
+      # Path to the private key mounted via secret
+      - UNIFI_SSH_PRIVATE_KEY=/run/secrets/unifi_ssh_key
+      # How often to run the sync (in seconds)
+      - SYNC_INTERVAL=3600
+    secrets:
+      - unifi_ssh_key
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+
+secrets:
+  unifi_ssh_key:
+    external: true
