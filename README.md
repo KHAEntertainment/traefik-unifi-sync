@@ -68,8 +68,9 @@ variables are:
 | `UNIFI_SSH_PASSWORD`     | SSH password (if using password authentication).                                                          |
 | `UNIFI_SSH_PRIVATE_KEY`  | Path to a private key file inside the container (if using key authentication).                           |
 | `SYNC_INTERVAL`          | Optional number of seconds between syncs.  If unset, the script runs once and exits.                     |
-| `DOMAIN_SUFFIX`          | Optional suffix (e.g. `.home.arpa`) used to filter host names.  Only host names ending in this suffix
-                           | will be synced.                                                                                          |
+| `DOMAIN_SUFFIX`          | Optional suffix (e.g. `.home.arpa`) used to filter host names.  Only host names ending in this suffix will be synced. |
+| `DEBUG`                  | If set (e.g. `1`), prints verbose logs, including the discovered host → IP mapping and actions taken.    |
+| `DRY_RUN`                | If set (e.g. `1`), prints the planned host → IP mapping and exits without applying changes to UniFi.     |
 
 ### Example (Docker Compose)
 
@@ -152,6 +153,20 @@ private key from that path to authenticate to your UniFi device.  For
 additional sensitive values such as Traefik API credentials you can either
 set them as environment variables on the service or modify the script to
 read `_FILE`‑suffixed environment variables pointing to secret files.
+
+### Dry-run preview
+
+If you want to see which DNS host records would be created without actually
+modifying your UniFi device, set `DRY_RUN=1` when running the container.  You
+can also set `DEBUG=1` to print the detailed host→IP mapping.  For example:
+
+```bash
+docker run --rm \
+  -e TRAEFIK_API_URL=http://traefik:8080/api \
+  -e DRY_RUN=1 \
+  -e DEBUG=1 \
+    ghcr.io/your-account/traefik-unifi-sync:latest
+```
 
 ## Caveats
 
