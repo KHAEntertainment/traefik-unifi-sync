@@ -30,6 +30,22 @@ except ImportError:
     paramiko = None  # type: ignore
 
 
+def print_mapping(host_ip_map: Dict[str, str]) -> None:
+    """
+    Print the hostname→IP mapping that will be applied.
+
+    This helper provides a clear list of DNS records when running in debug
+    or dry-run mode.  If no mappings are present it indicates that no
+    hostnames were discovered from Traefik.
+    """
+    if not host_ip_map:
+        print("No host mappings discovered from Traefik.")
+        return
+    print("Planned DNS host records (hostname → IP):")
+    for host, ip in sorted(host_ip_map.items()):
+        print(f"  {host} -> {ip}")
+
+
 def debug(msg: str) -> None:
     """Simple debug logger controlled by DEBUG env var."""
     if os.environ.get("DEBUG"):
@@ -156,8 +172,13 @@ def fetch_traefik_hosts() -> Dict[str, str]:
         if not ip:
             debug(f"No IP found for service {svc_endpoint}")
             continue
-        for hostname in hostnames:
-            hosts[hostname] = ip
+    for hostname in hostnames:
+        hosts[hostname] = ip
+    # In debug mode print the discovered mapping
+    if os.environ.get("DEBUG"):
+        debug("Discovered host → IP map from Traefik:")
+        for h, addr in sorted(hosts.items()):
+            debug(f"  {h} -> {addr}")
     return hosts
 
 
@@ -295,6 +316,12 @@ def sync_once() -> bool:
     if not host_ip_map:
         debug("No host mappings discovered from Traefik; skipping update")
         return False
+
+    # Dry-run: print mapping and exit without connecting to UniFi
+    if os.environ.get("DRY_RUN"):
+        print_mapping(host_ip_map)
+        print("DRY_RUN=1 set: not connecting to UniFi, not applying any changes.")
+        return True
     ssh = ssh_connect()
     if ssh is None:
         return False
@@ -305,6 +332,11 @@ def sync_once() -> bool:
         if not update_dns_records(services, host_ip_map):
             debug("DNS records already up to date; nothing to do")
             return True
+        # In debug mode show the final set that will be applied
+        if os.environ.get("DEBUG"):
+            debug("Applying updated dnsForwarder.hostRecords to UniFi...")
+            for h, addr in sorted(host_ip_map.items()):
+                debug(f"  {h} -> {addr}")
         if not push_services_json(ssh, services):
             return False
         print(f"Updated {len(host_ip_map)} host record(s) on UniFi device")
